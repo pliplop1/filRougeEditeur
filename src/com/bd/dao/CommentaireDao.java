@@ -40,25 +40,39 @@ public class CommentaireDao {
         return commentaire;
     }
 
+    private void closeResources() throws DaoException {
+        try {
+            if (rs != null) rs.close();
+            if (ps != null) ps.close();
+        } catch (SQLException e) {
+            throw new DaoException("Erreur lors de la fermeture des ressources JDBC : " + e.getMessage(), e);
+        }
+    }
+
+    // --- Méthodes CRUD existantes et nouvelles méthodes ---
+
     public Commentaire addCommentaire(Commentaire commentaire) throws DaoException {
-        sql = "INSERT INTO commentaires (id_utilisateur, id_livre, text_commentaire, note) VALUES (?, ?, ?, ?)";
+        sql = "INSERT INTO commentaires (id_utilisateur, id_livre, text_commentaire, note, date_commentaire) VALUES (?, ?, ?, ?, ?)";
         try {
             ps = cn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setInt(1, commentaire.getId_utilisateur());
             ps.setInt(2, commentaire.getId_livre());
             ps.setString(3, commentaire.getText_commentaire());
             ps.setInt(4, commentaire.getNote());
+            ps.setTimestamp(5, Timestamp.valueOf(commentaire.getDate_commentaire())); // Utilise la date du Commentaire
 
-            int rowsAffected = ps.executeUpdate();
-            if (rowsAffected == 0) {
-                throw new DaoException("Échec de la création du commentaire, aucune ligne affectée.");
+            int affectedRows = ps.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new DaoException("La création du commentaire a échoué, aucune ligne affectée.");
             }
 
-            rs = ps.getGeneratedKeys();
-            if (rs.next()) {
-                commentaire.setId_commentaire(rs.getInt(1));
-            } else {
-                throw new DaoException("Échec de la récupération de l'ID du commentaire créé.");
+            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    commentaire.setId_commentaire(generatedKeys.getInt(1));
+                } else {
+                    throw new DaoException("La création du commentaire a échoué, aucun ID généré.");
+                }
             }
             return commentaire;
         } catch (SQLException e) {
@@ -86,18 +100,19 @@ public class CommentaireDao {
     }
 
     public boolean updateCommentaire(Commentaire commentaire) throws DaoException {
-        sql = "UPDATE commentaires SET id_utilisateur = ?, id_livre = ?, text_commentaire = ?, note = ? WHERE id_commentaire = ?";
+        sql = "UPDATE commentaires SET id_utilisateur = ?, id_livre = ?, text_commentaire = ?, note = ?, date_commentaire = ? WHERE id_commentaire = ?";
         try {
             ps = cn.prepareStatement(sql);
             ps.setInt(1, commentaire.getId_utilisateur());
             ps.setInt(2, commentaire.getId_livre());
             ps.setString(3, commentaire.getText_commentaire());
             ps.setInt(4, commentaire.getNote());
-            ps.setInt(5, commentaire.getId_commentaire());
-            int rowsAffected = ps.executeUpdate();
-            return rowsAffected > 0;
+            ps.setTimestamp(5, Timestamp.valueOf(commentaire.getDate_commentaire()));
+            ps.setInt(6, commentaire.getId_commentaire());
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
         } catch (SQLException e) {
-            throw new DaoException("Erreur lors de la mise à jour du commentaire avec ID: " + commentaire.getId_commentaire(), e);
+            throw new DaoException("Erreur lors de la mise à jour du commentaire: " + e.getMessage(), e);
         } finally {
             closeResources();
         }
@@ -108,46 +123,10 @@ public class CommentaireDao {
         try {
             ps = cn.prepareStatement(sql);
             ps.setInt(1, id);
-            int rowsAffected = ps.executeUpdate();
-            return rowsAffected > 0;
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
         } catch (SQLException e) {
-            throw new DaoException("Erreur lors de la suppression du commentaire avec ID: " + id, e);
-        } finally {
-            closeResources();
-        }
-    }
-
-    public List<Commentaire> getCommentairesByLivre(int idLivre) throws DaoException {
-        List<Commentaire> commentaires = new ArrayList<>();
-        sql = "SELECT * FROM commentaires WHERE id_livre = ?";
-        try {
-            ps = cn.prepareStatement(sql);
-            ps.setInt(1, idLivre);
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                commentaires.add(mapResultSetToCommentaire(rs));
-            }
-            return commentaires;
-        } catch (SQLException e) {
-            throw new DaoException("Erreur lors de la récupération des commentaires pour le livre ID: " + idLivre, e);
-        } finally {
-            closeResources();
-        }
-    }
-
-    public List<Commentaire> getCommentairesByUtilisateur(int idUtilisateur) throws DaoException {
-        List<Commentaire> commentaires = new ArrayList<>();
-        sql = "SELECT * FROM commentaires WHERE id_utilisateur = ?";
-        try {
-            ps = cn.prepareStatement(sql);
-            ps.setInt(1, idUtilisateur);
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                commentaires.add(mapResultSetToCommentaire(rs));
-            }
-            return commentaires;
-        } catch (SQLException e) {
-            throw new DaoException("Erreur lors de la récupération des commentaires pour l'utilisateur ID: " + idUtilisateur, e);
+            throw new DaoException("Erreur lors de la suppression du commentaire: " + e.getMessage(), e);
         } finally {
             closeResources();
         }
@@ -187,12 +166,27 @@ public class CommentaireDao {
         }
     }
 
-    private void closeResources() throws DaoException {
+    /**
+     * Récupère tous les commentaires associés à un livre spécifique.
+     * @param idLivre L'ID du livre pour lequel récupérer les commentaires.
+     * @return Une liste de commentaires pour le livre spécifié.
+     * @throws DaoException en cas d'erreur de base de données.
+     */
+    public List<Commentaire> getCommentairesByLivreId(int idLivre) throws DaoException {
+        List<Commentaire> commentaires = new ArrayList<>();
+        sql = "SELECT * FROM commentaires WHERE id_livre = ? ORDER BY date_commentaire DESC";
         try {
-            if (rs != null) rs.close();
-            if (ps != null) ps.close();
+            ps = cn.prepareStatement(sql);
+            ps.setInt(1, idLivre);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                commentaires.add(mapResultSetToCommentaire(rs));
+            }
+            return commentaires;
         } catch (SQLException e) {
-            throw new DaoException("Erreur lors de la fermeture des ressources JDBC : " + e.getMessage(), e);
+            throw new DaoException("Erreur lors de la récupération des commentaires pour le livre ID: " + idLivre, e);
+        } finally {
+            closeResources();
         }
     }
 }
