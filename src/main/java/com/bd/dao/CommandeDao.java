@@ -48,7 +48,7 @@ public class CommandeDao {
 
     // --- Méthodes CRUD ---
 
-    public void addCommande(Commande commande) throws DaoException {
+    public Commande addCommande(Commande commande) throws DaoException { // <-- CHANGEMENT ICI (void -> Commande)
         // date_commande et statut sont gérés par la DB
         sql = "INSERT INTO commandes (id_utilisateur, montant_total) VALUES (?, ?)";
         try {
@@ -77,6 +77,7 @@ public class CommandeDao {
         } finally {
             closeResources();
         }
+        return commande; // <-- CHANGEMENT ICI (ajout du return)
     }
 
     public Commande getCommandeById(int id) throws DaoException { // Renommé de findCommandeById

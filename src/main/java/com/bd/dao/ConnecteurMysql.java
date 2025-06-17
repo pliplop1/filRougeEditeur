@@ -7,19 +7,17 @@ import java.sql.SQLException;
 
 import com.bd.exceptions.DaoException;
 
-public class ConnecteurMysql {
+// 1. Implémenter l'interface
+public class ConnecteurMysql implements AutoCloseable {
 
-    // Informations de connexion à votre base de données
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/filrouge"; // REMPLACEZ "votre_bd" par le nom de votre base de données
-    private static final String DB_USER = "root"; // REMPLACEZ "votre_utilisateur" par votre nom d'utilisateur MySQL
-    private static final String DB_PASSWORD = "root"; // REMPLACEZ "votre_mot_de_passe" par votre mot de passe MySQL
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/filrouge";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "root";
 
-    private Connection connection; // L'objet Connection sera géré en interne
+    private Connection connection;
 
     public ConnecteurMysql() throws DaoException {
         try {
-            // Charger le pilote JDBC (si nécessaire, pas toujours pour JDBC 4.0+)
-            // Class.forName("com.mysql.cj.jdbc.Driver"); // Décommenter si vous avez des problèmes de pilote non trouvé
             this.connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
             System.out.println("Connexion à la base de données établie avec succès.");
         } catch (SQLException e) {
@@ -27,13 +25,13 @@ public class ConnecteurMysql {
         }
     }
 
-    // CORRECTION : Méthode pour obtenir la connexion
     public Connection getConnection() {
         return this.connection;
     }
 
-    // CORRECTION : Méthode pour fermer la connexion (sans argument)
-    public void closeConnection() throws DaoException {
+    // 2. Renommer la méthode en "close"
+    @Override
+    public void close() throws DaoException {
         if (this.connection != null) {
             try {
                 this.connection.close();
